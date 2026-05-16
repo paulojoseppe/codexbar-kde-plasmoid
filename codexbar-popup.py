@@ -67,6 +67,17 @@ WINDOW_LABELS = {
     "tertiary": "Monthly",
 }
 
+# Providers that have at least one non-web Linux path (OAuth, API key, CLI,
+# local probe). Everything else either requires browser cookies or is gated to
+# macOS in the upstream CLI.
+LINUX_SUPPORTED = {
+    "codex", "claude", "gemini", "copilot", "kilo", "openrouter", "deepseek",
+    "moonshot", "codebuff", "zai", "warp", "venice", "crof", "minimax",
+    "kimik2", "vertexai", "antigravity",
+}
+
+CONFIG_PATH = Path.home() / ".codexbar" / "config.json"
+
 # CSS mirrors the macOS menu popover: light translucent panel, dark text,
 # thin hairline dividers, no card boxes, restrained accent only on the
 # active provider tab.
@@ -212,6 +223,38 @@ window.codexbar-popup {
 }
 .codexbar-footer-btn label { color: inherit; font-size: 12px; }
 
+/* --- Settings view --- */
+.codexbar-settings-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111111;
+}
+.codexbar-settings-list {
+    background-color: #ffffff;
+}
+.codexbar-settings-row {
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.codexbar-settings-row.disabled .codexbar-settings-name {
+    color: #9a9a9a;
+}
+.codexbar-settings-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111111;
+}
+.codexbar-settings-hint {
+    font-size: 11px;
+    color: #9a9a9a;
+}
+.codexbar-settings-group {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b6b6b;
+    padding: 14px 0 4px 0;
+}
+
 /* --- Progress bar: thin pill, gray track, system-blue fill --- */
 levelbar.codex-usage {
     background-color: transparent;
@@ -280,6 +323,38 @@ def default_provider(data: list) -> str | None:
     return max(pool, key=max_pct).get("provider")
 
 
+def load_full_config() -> dict:
+    """Returns the canonical config (every provider known to the CLI, with the
+    current enabled flag merged in). Uses `codexbar config dump` so the schema
+    stays in sync with the CLI version that's actually installed."""
+    try:
+        result = subprocess.run(
+            [CODEXBAR, "config", "dump"],
+            capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        pass
+    # Fallback: read whatever's on disk.
+    if CONFIG_PATH.exists():
+        try:
+            return json.loads(CONFIG_PATH.read_text())
+        except json.JSONDecodeError:
+            pass
+    return {"providers": [], "version": 1}
+
+
+def save_config(enabled: dict[str, bool]) -> None:
+    """Write only the providers we want enabled. The CLI fills in defaults for
+    any provider missing from the file, so we don't need to list disabled ones."""
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "providers": [{"id": pid, "enabled": True} for pid, on in enabled.items() if on],
+        "version": 1,
+    }
+    CONFIG_PATH.write_text(json.dumps(payload, indent=2) + "\n")
+
+
 def open_text_file(path: str) -> None:
     """Open a file in a real text editor.
 
@@ -336,6 +411,8 @@ class CodexBarPopup(Gtk.Application):
         self.data: list = []
         self.active_pid: str | None = None
         self.tab_buttons: dict[str, Gtk.Button] = {}
+        self.view: str = "usage"             # "usage" | "settings"
+        self.settings_switches: dict[str, Gtk.Switch] = {}
 
     def do_activate(self):  # noqa: N802
         if self.window is None:
@@ -404,6 +481,8 @@ class CodexBarPopup(Gtk.Application):
 
         self.data = load_cached()
         self.active_pid = default_provider(self.data)
+        if os.environ.get("CODEXBAR_INITIAL_VIEW") == "settings":
+            self.view = "settings"
         self.render()
         self.refresh(background=True)
         return win
@@ -414,21 +493,23 @@ class CodexBarPopup(Gtk.Application):
             return True
         return False
 
-    def _on_settings(self, _btn):
-        self._on_settings_call()
-
-    def _on_about(self, _btn):
-        self._on_about_call()
-
     def _on_settings_call(self):
-        path = Path.home() / ".codexbar" / "config.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists():
-            path.write_text('{"providers": [], "version": 1}\n')
-        open_text_file(str(path))
+        self.view = "settings"
+        self.render()
 
     def _on_about_call(self):
         subprocess.Popen(["xdg-open", "https://codexbar.app"])
+
+    def _on_settings_back(self):
+        self.view = "usage"
+        self.render()
+
+    def _on_settings_save(self):
+        enabled = {pid: sw.get_active() for pid, sw in self.settings_switches.items()}
+        save_config(enabled)
+        self.view = "usage"
+        self.render()
+        self.refresh(background=True)
 
     def refresh(self, *, background: bool):
         def worker():
@@ -449,12 +530,17 @@ class CodexBarPopup(Gtk.Application):
     def render(self):
         self._clear(self.tabbar)
         self._clear(self.body)
+        if self.view == "settings":
+            self._render_settings_header()
+            self._render_settings_body()
+            return
+        self._render_usage_header()
+        self._render_usage_body()
 
+    def _render_usage_header(self):
         if not self.data:
             self.tabbar.append(Gtk.Label(label="Loading…"))
             return
-
-        # Tab strip.
         self.tab_buttons.clear()
         for entry in self.data:
             pid = entry.get("provider", "")
@@ -467,18 +553,98 @@ class CodexBarPopup(Gtk.Application):
                 lambda p=pid: self._select(p))
             self.tabbar.append(pill)
             self.tab_buttons[pid] = pill
-        # Right side: refresh + close.
         self.tabbar.append(Gtk.Box(hexpand=True))
         self.tabbar.append(self._make_pill(
             "↻", ["codexbar-iconbtn"], lambda: self.refresh(background=True)))
         self.tabbar.append(self._make_pill(
             "✕", ["codexbar-iconbtn"], self.quit))
 
-        # Body: active provider card.
+    def _render_usage_body(self):
+        if not self.data:
+            return
         active = next((e for e in self.data if e.get("provider") == self.active_pid), None)
         if active is None:
             return
         self._render_provider(active)
+
+    def _render_settings_header(self):
+        back = self._make_pill("← Back", ["codexbar-tab"], self._on_settings_back)
+        self.tabbar.append(back)
+        title = Gtk.Label(label="Settings", xalign=0.0, hexpand=True)
+        title.add_css_class("codexbar-settings-title")
+        self.tabbar.append(title)
+        save = self._make_pill("Save", ["codexbar-tab", "active"], self._on_settings_save)
+        self.tabbar.append(save)
+
+    def _render_settings_body(self):
+        self.settings_switches.clear()
+        cfg = load_full_config()
+        existing = {p.get("id"): bool(p.get("enabled")) for p in cfg.get("providers", [])}
+
+        # Section: providers.
+        section_title = Gtk.Label(label="Providers", xalign=0.0)
+        section_title.add_css_class("codexbar-section-title")
+        self.body.append(section_title)
+        section_hint = Gtk.Label(
+            label="Toggle which providers feed the bar and the popup.",
+            xalign=0.0, wrap=True)
+        section_hint.add_css_class("codexbar-subtitle")
+        self.body.append(section_hint)
+
+        # Scrollable list.
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_min_content_height(280)
+        scroller.set_propagate_natural_width(True)
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        list_box.add_css_class("codexbar-settings-list")
+        scroller.set_child(list_box)
+        self.body.append(scroller)
+
+        # Linux-supported first, alphabetised; then unsupported with hint.
+        provider_ids = [p.get("id") for p in cfg.get("providers", [])]
+        supported = sorted(p for p in provider_ids if p in LINUX_SUPPORTED)
+        unsupported = sorted(p for p in provider_ids if p not in LINUX_SUPPORTED)
+
+        for pid in supported:
+            list_box.append(self._settings_row(pid, existing.get(pid, False), enabled_ui=True))
+
+        if unsupported:
+            divider_label = Gtk.Label(label="macOS-only providers", xalign=0.0)
+            divider_label.add_css_class("codexbar-settings-group")
+            list_box.append(divider_label)
+            for pid in unsupported:
+                list_box.append(self._settings_row(pid, existing.get(pid, False), enabled_ui=False))
+
+        # Footer note.
+        note = Gtk.Label(
+            label=f"Config: {CONFIG_PATH}",
+            xalign=0.0, wrap=True)
+        note.add_css_class("codexbar-subtitle")
+        self.body.append(note)
+
+    def _settings_row(self, pid: str, enabled: bool, *, enabled_ui: bool) -> Gtk.Widget:
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        row.add_css_class("codexbar-settings-row")
+        if not enabled_ui:
+            row.add_css_class("disabled")
+
+        name = Gtk.Label(label=PROVIDER_NAMES.get(pid, pid.title()), xalign=0.0, hexpand=True)
+        name.add_css_class("codexbar-settings-name")
+        row.append(name)
+
+        if not enabled_ui:
+            hint = Gtk.Label(label="macOS only", xalign=1.0)
+            hint.add_css_class("codexbar-settings-hint")
+            row.append(hint)
+
+        switch = Gtk.Switch()
+        switch.set_active(enabled)
+        switch.set_sensitive(enabled_ui)
+        switch.set_valign(Gtk.Align.CENTER)
+        row.append(switch)
+        self.settings_switches[pid] = switch
+        return row
 
     def _select(self, pid: str):
         if pid == self.active_pid:

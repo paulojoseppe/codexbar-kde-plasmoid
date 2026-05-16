@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- Popover **Settings…** now opens `~/.codexbar/config.json` in a real text
-  editor (VS Code → Zed → gedit → kate → …) instead of sending the JSON to
-  whatever `xdg-open` decides — which on most setups was a web browser. Falls
-  back to `$VISUAL` / `$EDITOR` in a detected terminal. Override with
-  `CODEXBAR_EDITOR`.
+### Changed
+- **Settings is now an inline view inside the popover** — no external editor,
+  no JSON file opened in a browser. Clicking *Settings…* swaps the popup
+  body to a scrollable provider list with per-provider toggle switches.
+  *Save* writes back to `~/.codexbar/config.json` and refreshes the data;
+  *Back* cancels.
+- Linux-unsupported providers (macOS-only web/cookie sources) appear in their
+  own grayed-out section with a "macOS only" hint, so it's obvious why you
+  can't enable them without trial-and-error.
 
 ## [0.1.0] — 2026-05-16
 
