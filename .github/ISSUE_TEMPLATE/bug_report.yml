@@ -1,0 +1,54 @@
+name: Bug report
+description: Something's not working as expected.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please include enough detail to reproduce.
+
+  - type: input
+    id: distro
+    attributes:
+      label: Distro and compositor
+      placeholder: "Arch Linux, Hyprland 0.40, Waybar 0.10"
+    validations:
+      required: true
+
+  - type: input
+    id: codexbar_version
+    attributes:
+      label: codexbar CLI version
+      description: "Output of `codexbar --version`."
+      placeholder: "CodexBar v0.26.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you see instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: wrapper_output
+    attributes:
+      label: Wrapper script output
+      description: "Paste the output of `~/.config/waybar/scripts/codexbar.sh | jq`."
+      render: shell
+
+  - type: textarea
+    id: popup_output
+    attributes:
+      label: Popup script output (if relevant)
+      description: "Run `~/.config/waybar/scripts/codexbar-popup.py` directly from a terminal so GTK warnings are visible. Paste here."
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, theme info, related issues, etc.

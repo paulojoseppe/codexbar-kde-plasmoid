@@ -1,5 +1,8 @@
 # codexbar-waybar
 
+[![CI](https://github.com/Marouan-chak/codexbar-waybar/actions/workflows/ci.yml/badge.svg)](https://github.com/Marouan-chak/codexbar-waybar/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > AI provider usage in your [Waybar](https://github.com/Alexays/Waybar) — and a macOS-style popover when you click it.
 
 [CodexBar](https://github.com/steipete/CodexBar) is a macOS menu-bar app that
@@ -181,6 +184,13 @@ The Waybar module emits one of these classes; style them in
   Linux CLI this project wraps.
 - [Win-CodexBar](https://github.com/Finesssee/Win-CodexBar) — Windows port of
   the macOS app.
+
+## Contributing
+
+PRs and issues welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports
+go through the GitHub issue templates; anything about the `codexbar` CLI
+itself belongs in the
+[upstream tracker](https://github.com/steipete/CodexBar/issues) instead.
 
 ## License
 
