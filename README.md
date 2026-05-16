@@ -121,12 +121,16 @@ definition or your shell profile.
 | --- | --- | --- |
 | `CODEXBAR_BIN` | `~/.local/bin/codexbar` | Path to the CLI binary. |
 | `CODEXBAR_STAGGER` | `0.5` | Seconds between provider fetches (raises this if Claude OAuth keeps 429-ing). |
+| `CODEXBAR_PROVIDERS` | from config.json | Space-separated provider IDs to query, bypassing `~/.codexbar/config.json`. Set per-Waybar instance if you want different provider sets per monitor. |
 | `XDG_CACHE_HOME` | `~/.cache` | Where `last.json` snapshots live. |
 | `CODEXBAR_LAYER_SHELL_LIB` | auto-detected | Override path to `libgtk4-layer-shell.so` if your distro stashes it somewhere unusual. |
 
-To change which providers appear, edit `PROVIDERS=( … )` and `SOURCE_OVERRIDES`
-at the top of `codexbar.sh`. Codex and Claude need `--source oauth` on Linux
-because their `auto` source tries the (macOS-only) web scrape first.
+To change which providers appear, open the popover and click **Settings…** —
+the inline view lets you toggle providers and Save back to
+`~/.codexbar/config.json`. The wrapper script picks up the new list on the
+next refresh (the popover nudges Waybar to refresh immediately via
+`SIGRTMIN+8`). Codex and Claude need `--source oauth` on Linux; the wrapper
+sets that automatically via `SOURCE_OVERRIDES` at the top of `codexbar.sh`.
 
 ## How it works
 

@@ -510,6 +510,9 @@ class CodexBarPopup(Gtk.Application):
         self.view = "usage"
         self.render()
         self.refresh(background=True)
+        # Nudge waybar so the bar reflects the new provider list without
+        # waiting for the next interval. The signal is wired up in codexbar.jsonc.
+        subprocess.Popen(["pkill", "-RTMIN+8", "waybar"])
 
     def refresh(self, *, background: bool):
         def worker():

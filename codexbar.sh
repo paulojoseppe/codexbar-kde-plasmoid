@@ -6,18 +6,33 @@
 # Last successful per-provider snapshot is cached, so a transient 429 is masked
 # until the next refresh recovers it.
 #
-# Linux-only providers used here (cookies/web providers are macOS-only).
-# Edit PROVIDERS / SOURCE_OVERRIDES below to add more.
+# Linux-only providers — cookies/web providers are macOS-only. The list is
+# read from ~/.codexbar/config.json (use the popover's Settings view to
+# manage it); falls back to codex+claude+gemini if the file is missing.
 
 set -u
 
 CODEXBAR="${CODEXBAR_BIN:-${HOME}/.local/bin/codexbar}"
+CONFIG_PATH="${HOME}/.codexbar/config.json"
 CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/codexbar-waybar"
 mkdir -p "$CACHE_DIR"
 
-# Provider list and per-provider source override.
-# Codex/Claude need explicit --source oauth on Linux (auto tries web first).
-PROVIDERS=(codex claude gemini)
+# Read enabled providers from the codexbar CLI's config, fall back to a
+# sensible default if it's missing or unreadable. Override with the
+# CODEXBAR_PROVIDERS env var (space-separated list) when you want to bypass
+# config.json for a specific waybar instance.
+if [[ -n "${CODEXBAR_PROVIDERS:-}" ]]; then
+    # shellcheck disable=SC2206
+    PROVIDERS=( ${CODEXBAR_PROVIDERS} )
+elif [[ -f "$CONFIG_PATH" ]] && command -v jq >/dev/null 2>&1; then
+    readarray -t PROVIDERS < <(jq -r '[.providers[]? | select(.enabled == true) | .id] | .[]' "$CONFIG_PATH" 2>/dev/null)
+    [[ ${#PROVIDERS[@]} -eq 0 ]] && PROVIDERS=(codex claude gemini)
+else
+    PROVIDERS=(codex claude gemini)
+fi
+
+# Per-provider --source override. Codex/Claude need explicit oauth on Linux
+# (their `auto` falls back to web first, which is macOS-only).
 declare -A SOURCE_OVERRIDES=(
     [codex]=oauth
     [claude]=oauth

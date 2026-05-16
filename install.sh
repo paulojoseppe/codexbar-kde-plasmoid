@@ -24,8 +24,20 @@ yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
 
 # 1. codexbar binary check
 if ! command -v codexbar >/dev/null 2>&1; then
-    yellow "Warning: 'codexbar' is not on PATH."
-    yellow "Install the Linux CLI before continuing — see README.md for the tarball + libxml2-legacy notes."
+    red "'codexbar' is not on PATH."
+    cat <<'EOF' >&2
+
+Install the Linux CLI first:
+
+  curl -LO https://github.com/steipete/CodexBar/releases/latest/download/CodexBarCLI-linux-x86_64.tar.gz
+  tar -xzf CodexBarCLI-linux-x86_64.tar.gz
+  install -m 0755 CodexBarCLI ~/.local/bin/codexbar
+
+Arch users also need:  sudo pacman -S libxml2-legacy
+
+Then re-run this installer.
+EOF
+    exit 1
 fi
 
 # 2. Required deps
