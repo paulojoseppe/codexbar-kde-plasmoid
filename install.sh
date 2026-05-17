@@ -7,6 +7,7 @@
 #   - Copies codexbar.sh and codexbar-popup.py to $XDG_CONFIG_HOME/waybar/scripts/
 #   - Drops codexbar.jsonc (as custom-codexbar.json) into $XDG_CONFIG_HOME/waybar/modules/
 #   - Appends codexbar.css to $XDG_CONFIG_HOME/waybar/user-style.css (or creates it)
+#   - Installs provider SVG icons to $XDG_DATA_HOME/codexbar-waybar/icons/
 #   - Prints the snippet to add "custom/codexbar" to your config.jsonc
 #
 # What it does NOT do:
@@ -16,6 +17,7 @@
 set -euo pipefail
 
 WAYBAR_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/waybar"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/codexbar-waybar"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 red()    { printf '\033[31m%s\033[0m\n' "$*"; }
@@ -56,7 +58,15 @@ install -m 0644 "$SCRIPT_DIR/codexbar.jsonc"     "$WAYBAR_CONF/modules/custom-co
 green "Installed scripts → $WAYBAR_CONF/scripts/"
 green "Installed module  → $WAYBAR_CONF/modules/custom-codexbar.json"
 
-# 4. CSS — append if not already present.
+# 4. Provider SVG icons (for the popup tabs/settings rows).
+mkdir -p "$DATA_DIR/icons"
+if [[ -d "$SCRIPT_DIR/assets/providers" ]]; then
+    install -m 0644 "$SCRIPT_DIR/assets/providers"/ProviderIcon-*.svg "$DATA_DIR/icons/"
+    [[ -f "$SCRIPT_DIR/assets/providers/NOTICE" ]] && install -m 0644 "$SCRIPT_DIR/assets/providers/NOTICE" "$DATA_DIR/icons/NOTICE"
+    green "Installed icons   → $DATA_DIR/icons/"
+fi
+
+# 5. CSS — append if not already present.
 USER_STYLE="$WAYBAR_CONF/user-style.css"
 touch "$USER_STYLE"
 if ! grep -q "#custom-codexbar" "$USER_STYLE"; then

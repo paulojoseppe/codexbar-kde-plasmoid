@@ -9,25 +9,53 @@
 surfaces Codex / Claude / Gemini / Copilot / … usage limits and reset windows.
 It ships a Linux CLI but no desktop UI for Linux compositors.
 
-This repo bridges that gap:
+This repo bridges that gap with two pieces:
 
-- A tiny **Waybar custom module** that polls the `codexbar` CLI and shows the
-  most-constrained provider as `🤖 27%` with state classes for styling.
-- A **GTK4 popover** modeled on the macOS menu — provider tab strip, flat
-  sections, thin progress bars, reset countdowns, credits balance.
+- A **Waybar custom module** that polls the `codexbar` CLI and shows usage as
+  `🤖 5% • 1%` (session • weekly) for a pinned provider, or `🤖 5%` for the
+  most-constrained one across all enabled providers.
+- A **GTK4 popover** modelled on the macOS menu — provider tab strip with
+  real brand logos, flat sections, thin progress bars, reset countdowns,
+  credit balances, and an inline Settings view for toggling providers and
+  picking which one is pinned to the bar.
 
 <p align="center">
-  <img src="assets/popup.png" alt="codexbar-waybar popover" width="380" />
+  <img src="assets/popup.png" alt="codexbar-waybar popover with provider logos" width="370" />
+</p>
+
+<p align="center">
+  <img src="assets/bar.png" alt="codexbar-waybar Waybar segment showing session and weekly" width="225" />
 </p>
 
 Validated on Arch Linux + Hyprland (HyDE), but should work on any Wayland
 compositor with Waybar + gtk4-layer-shell.
 
+## Features
+
+- **Provider logos** in the tab strip and settings rows, sourced from
+  upstream CodexBar (39 brand marks). Auto-recoloured for light backgrounds;
+  see [`assets/providers/NOTICE`](assets/providers/NOTICE).
+- **Bar pin mode** — choose `Highest` for cross-provider max, or pin a single
+  provider to show its session and weekly side by side (`🤖 5% • 1%`).
+  Toggled live from the popover's Settings view, no Save needed.
+- **Inline Settings** — flips the popover body to a scrollable provider list
+  with per-provider switches; macOS-only providers appear in their own
+  greyed-out section.
+- **OAuth → CLI fallback for Claude.** When Anthropic's OAuth endpoint
+  rate-limits, the wrapper transparently retries via the local Claude CLI
+  source so the bar never goes blank.
+- **Last-good cache** at `~/.cache/codexbar-waybar/last.json`. Transient 429s
+  or network blips reuse the previous value and surface as `stale` instead of
+  blanking the bar.
+- **Signal-driven refresh** (`pkill -RTMIN+8 waybar`) so a Settings change
+  reflects on the bar within a second instead of waiting for the next tick.
+
 ## Requirements
 
 - The `codexbar` Linux CLI from
   [steipete/CodexBar releases](https://github.com/steipete/CodexBar/releases/latest).
-- [Waybar](https://github.com/Alexays/Waybar).
+- [Waybar](https://github.com/Alexays/Waybar) 0.10+ (needs `signal` support
+  on custom modules).
 - `jq`, `python3`, `python-gobject` (PyGObject), `gtk4`, `gtk4-layer-shell`,
   `libadwaita` (optional but harmless).
 
@@ -60,22 +88,11 @@ install -m 0755 CodexBarCLI ~/.local/bin/codexbar
 codexbar --help
 ```
 
-Then configure providers in `~/.codexbar/config.json`. Minimal Linux-friendly
-config:
-
-```json
-{
-  "providers": [
-    { "id": "codex",  "enabled": true },
-    { "id": "claude", "enabled": true },
-    { "id": "gemini", "enabled": true }
-  ],
-  "version": 1
-}
-```
-
 Make sure you've already signed in via the providers' own CLIs (`codex login`,
 `claude /login`, `gcloud auth application-default login` for Gemini, etc.).
+The CLI bootstraps a `~/.codexbar/config.json` with Codex enabled by default
+the first time it runs; use the popover's Settings view to toggle Claude,
+Gemini, or anything else on without hand-editing JSON.
 
 ## Install codexbar-waybar
 
@@ -92,9 +109,10 @@ The installer:
 - Copies `codexbar.sh` and `codexbar-popup.py` to `~/.config/waybar/scripts/`.
 - Drops `codexbar.jsonc` as `~/.config/waybar/modules/custom-codexbar.json`.
 - Appends `codexbar.css` to `~/.config/waybar/user-style.css` (idempotent).
+- Installs provider SVGs to `~/.local/share/codexbar-waybar/icons/`.
 
-The one manual step is wiring `custom/codexbar` into your `config.jsonc`. For a
-hand-curated config, add it to a `modules-right` group:
+The one manual step is wiring `custom/codexbar` into your `config.jsonc`. For
+a hand-curated config, add it to a `modules-right` group:
 
 ```jsonc
 "group/pill#right1": {
@@ -106,10 +124,20 @@ Reload Waybar (`Ctrl+Alt+W` on HyDE, or `pkill waybar; waybar &`).
 
 ## Usage
 
-- **Left-click** the `🤖 nn%` icon → opens the popover (clicking again closes
-  it).
+- **Left-click** the `🤖 …%` segment → opens the popover (click again to
+  close).
 - **Right-click** → `notify-send` summary, no GUI.
-- **Tab strip** in the popover lets you switch between providers.
+- **Tab strip** in the popover switches the active provider's card.
+- **Settings → Show in bar** picks which provider the bar pins to, or
+  reverts to `Highest`. Selection writes
+  `~/.config/codexbar-waybar/state.json` and signals waybar immediately.
+- **Settings → Providers** toggles which providers feed the bar and popover.
+  *Save* writes `~/.codexbar/config.json` and triggers a refresh.
+
+<p align="center">
+  <img src="assets/settings.png" alt="codexbar-waybar inline settings view" width="395" />
+</p>
+
 - **ESC** or the `✕` button closes the popover.
 
 ## Tuning
@@ -120,37 +148,41 @@ definition or your shell profile.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `CODEXBAR_BIN` | `~/.local/bin/codexbar` | Path to the CLI binary. |
-| `CODEXBAR_STAGGER` | `0.5` | Seconds between provider fetches (raises this if Claude OAuth keeps 429-ing). |
-| `CODEXBAR_PROVIDERS` | from config.json | Space-separated provider IDs to query, bypassing `~/.codexbar/config.json`. Set per-Waybar instance if you want different provider sets per monitor. |
-| `XDG_CACHE_HOME` | `~/.cache` | Where `last.json` snapshots live. |
+| `CODEXBAR_STAGGER` | `0.5` | Seconds between provider fetches (raise it if Claude OAuth keeps 429-ing). |
+| `CODEXBAR_PROVIDERS` | from `config.json` | Space-separated provider IDs to query, bypassing `~/.codexbar/config.json`. Set per-Waybar instance if you want different sets per monitor. |
+| `CODEXBAR_BAR_PROVIDER` | from `state.json` | Pin a specific provider's session/weekly to the bar regardless of state. Set to a provider ID, or unset for `Highest`. |
 | `CODEXBAR_LAYER_SHELL_LIB` | auto-detected | Override path to `libgtk4-layer-shell.so` if your distro stashes it somewhere unusual. |
+| `XDG_CACHE_HOME` | `~/.cache` | Where `last.json` snapshots live. |
+| `XDG_DATA_HOME` | `~/.local/share` | Where provider icons live (under `codexbar-waybar/icons/`). |
 
 To change which providers appear, open the popover and click **Settings…** —
 the inline view lets you toggle providers and Save back to
-`~/.codexbar/config.json`. The wrapper script picks up the new list on the
-next refresh (the popover nudges Waybar to refresh immediately via
-`SIGRTMIN+8`). Codex and Claude need `--source oauth` on Linux; the wrapper
-sets that automatically via `SOURCE_OVERRIDES` at the top of `codexbar.sh`.
+`~/.codexbar/config.json`. Codex and Claude need `--source oauth` on Linux;
+the wrapper sets that automatically via `SOURCE_OVERRIDES` at the top of
+`codexbar.sh` and falls back to `--source cli` on errors where the CLI source
+is available (currently: Claude).
 
 ## How it works
 
-1. Waybar runs `codexbar.sh` every 60 s.
-2. The script invokes `codexbar usage --provider <p> --format json` once per
-   enabled provider, sequentially, with a small stagger to dodge per-provider
-   rate limits.
+1. Waybar runs `codexbar.sh` every 30 s (or whenever it receives
+   `SIGRTMIN+8`).
+2. The script reads `~/.codexbar/config.json` to learn which providers are
+   enabled, then invokes `codexbar usage --provider <p> --format json` once
+   per enabled provider, sequentially, with a small stagger.
 3. Each response is the same JSON payload the macOS menu-bar app consumes:
    primary / secondary / tertiary usage windows, reset timestamps, credit
-   balances, error info.
-4. The shell wrapper collapses that into Waybar's JSON contract
-   `{"text", "tooltip", "class", "percentage"}` keyed on the highest
-   `usedPercent`.
+   balances, error info. Claude OAuth 429s trigger a transparent retry via
+   `--source cli` so the bar keeps working off the local Claude CLI logs.
+4. The wrapper collapses the merged payload into Waybar's JSON contract
+   `{"text", "tooltip", "class", "percentage"}`. The `text` field honours
+   `~/.config/codexbar-waybar/state.json` (pinned provider) or falls back to
+   the highest `usedPercent` across all responses.
 5. The latest successful per-provider response is cached at
-   `~/.cache/codexbar-waybar/last.json`. The popover paints from the cache for
-   an instant first frame, then refetches in the background.
-
-The popup itself is a GTK4 + `gtk4-layer-shell` window anchored to the top-right
-of the focused output, with all rendering done in pure CSS — no extra widget
-frameworks.
+   `~/.cache/codexbar-waybar/last.json`. The popover paints from the cache
+   for an instant first frame and then refetches in the background.
+6. The popover is a GTK4 + `gtk4-layer-shell` window anchored to the
+   top-right of the focused output. SVG provider logos are mirrored from
+   upstream CodexBar (MIT) and recoloured at load time for the light panel.
 
 ## States and styling
 
@@ -171,12 +203,14 @@ The Waybar module emits one of these classes; style them in
 | `libxml2.so.2: cannot open shared object file` | Install your distro's libxml2 v2.13 compat (`libxml2-legacy` on Arch). |
 | Module text is blank | Run `~/.config/waybar/scripts/codexbar.sh` directly — it should print one JSON line. |
 | Popover never shows | Run `~/.config/waybar/scripts/codexbar-popup.py` from a terminal; check the warnings. The most common one is `gtk4-layer-shell` not preloading — set `CODEXBAR_LAYER_SHELL_LIB`. |
-| `HTTP 429 rate_limit_error` from Claude | Raise `CODEXBAR_STAGGER=1.0` and the module `interval` to 120. |
-| Tabs render dark / unreadable | You're probably running an old version that fought Adwaita. Pull latest and reinstall. |
+| `HTTP 429 rate_limit_error` from Claude | The wrapper already falls back to the local Claude CLI source. If you still see persistent errors, raise `CODEXBAR_STAGGER=1.0` and the module `interval` to 60. |
+| Provider logos look like blank squares | Re-run `./install.sh` to refresh `~/.local/share/codexbar-waybar/icons/`. |
+| Bar pin doesn't update instantly | Make sure your Waybar module def has `"signal": 8` (the bundled `codexbar.jsonc` already does). |
 
 ## Roadmap
 
-- Auto-dismiss on outside click (today: ESC, `✕`, or click the bar icon).
+- Auto-dismiss the popover on outside click (today: ESC, `✕`, or clicking the
+  bar icon).
 - Dark-mode palette (auto-detect from `gsettings color-scheme` or HyDE
   wallbash).
 - AUR `PKGBUILD` for one-shot install on Arch.
@@ -184,8 +218,8 @@ The Waybar module emits one of these classes; style them in
 
 ## Related
 
-- [CodexBar](https://github.com/steipete/CodexBar) — the upstream macOS app and
-  Linux CLI this project wraps.
+- [CodexBar](https://github.com/steipete/CodexBar) — the upstream macOS app
+  and Linux CLI this project wraps.
 - [Win-CodexBar](https://github.com/Finesssee/Win-CodexBar) — Windows port of
   the macOS app.
 
@@ -198,4 +232,7 @@ itself belongs in the
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Provider SVG marks are redistributed from
+upstream CodexBar under the same MIT license (see
+[`assets/providers/NOTICE`](assets/providers/NOTICE)); the individual brand
+marks remain the property of their respective owners.

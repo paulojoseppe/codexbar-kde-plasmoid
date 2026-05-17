@@ -37,6 +37,8 @@ if os.environ.get("CODEXBAR_POPUP_PRELOADED") != "1" and _LAYER_SHELL_LIB:
     env["CODEXBAR_POPUP_PRELOADED"] = "1"
     os.execve(sys.executable, [sys.executable, *sys.argv], env)
 
+import re  # noqa: E402
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -59,12 +61,21 @@ PROVIDER_NAMES = {
     "vertexai": "Vertex AI",
     "openrouter": "OpenRouter",
     "openai": "OpenAI",
+    "kimik2": "Kimi K2",
 }
 
 WINDOW_LABELS = {
     "primary": "Session",
     "secondary": "Weekly",
     "tertiary": "Monthly",
+}
+
+# Provider id → icon filename (without the "ProviderIcon-" prefix and ".svg").
+# Most providers map to their own id; a few share an icon upstream.
+PROVIDER_ICON_ALIAS = {
+    "openai": "codex",
+    "moonshot": "kimi",
+    "kimik2": "kimi",
 }
 
 # Providers that have at least one non-web Linux path (OAuth, API key, CLI,
@@ -77,6 +88,12 @@ LINUX_SUPPORTED = {
 }
 
 CONFIG_PATH = Path.home() / ".codexbar" / "config.json"
+STATE_PATH = Path(
+    os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
+) / "codexbar-waybar" / "state.json"
+ICONS_DIR = Path(
+    os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))
+) / "codexbar-waybar" / "icons"
 
 # CSS mirrors the macOS menu popover: light translucent panel, dark text,
 # thin hairline dividers, no card boxes, restrained accent only on the
@@ -229,6 +246,14 @@ window.codexbar-popup {
     font-weight: 600;
     color: #111111;
 }
+.codexbar-bar-picker {
+    background-color: #ffffff;
+    padding: 4px 0 8px 0;
+}
+.codexbar-provider-icon {
+    -gtk-icon-size: 18px;
+    margin: 0 2px;
+}
 .codexbar-settings-list {
     background-color: #ffffff;
 }
@@ -292,6 +317,79 @@ def load_cached() -> list:
         except json.JSONDecodeError:
             return []
     return []
+
+
+def load_state() -> dict:
+    if STATE_PATH.exists():
+        try:
+            return json.loads(STATE_PATH.read_text())
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def save_state(state: dict) -> None:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STATE_PATH.write_text(json.dumps(state, indent=2) + "\n")
+
+
+_ICON_CACHE: dict[str, Path] = {}
+
+
+def resolve_icon_path(pid: str) -> Path | None:
+    """Return a recoloured copy of the provider SVG (dark text colour) so it
+    renders against the popup's light background. Upstream SVGs use
+    `fill=\"white\"`; we substitute that with our theme dark and cache."""
+    name = PROVIDER_ICON_ALIAS.get(pid, pid)
+    if name in _ICON_CACHE:
+        return _ICON_CACHE[name]
+    src = ICONS_DIR / f"ProviderIcon-{name}.svg"
+    if not src.exists():
+        return None
+    out_dir = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "codexbar-waybar" / "icons"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{name}.svg"
+    try:
+        svg = src.read_text()
+        # Recolour mask-style SVGs (single white path) to dark theme text.
+        recoloured = svg.replace('fill="white"', 'fill="#1c1c1e"') \
+                        .replace("fill='white'", "fill='#1c1c1e'") \
+                        .replace('fill="#ffffff"', 'fill="#1c1c1e"') \
+                        .replace('fill="#FFFFFF"', 'fill="#1c1c1e"')
+        out.write_text(recoloured)
+        _ICON_CACHE[name] = out
+        return out
+    except OSError:
+        return None
+
+
+def make_icon(pid: str, size: int = 18) -> Gtk.Widget | None:
+    path = resolve_icon_path(pid)
+    if path is None:
+        return None
+    img = Gtk.Image.new_from_file(str(path))
+    img.set_pixel_size(size)
+    img.add_css_class("codexbar-provider-icon")
+    return img
+
+
+_RESET_SPACE_AFTER = re.compile(r"^([Rr]esets)(?=\S)")
+_RESET_SPACE_BEFORE_PAREN = re.compile(r"(?<=\S)\(")
+_RESET_SPACE_AFTER_COMMA = re.compile(r",(?=\S)")
+_RESET_SPACE_BEFORE_AMPM = re.compile(r"(?<=\d)(?=[AaPp][Mm]\b)")
+
+
+def normalize_reset_description(text: str) -> str:
+    """Mirror codexbar.sh's reset normalisation. Handles both Claude OAuth
+    (\"May 17 at 6:20AM\") and Claude CLI (\"Resets6:20am(Europe/Paris)\")
+    by inserting the spaces the providers omit."""
+    if not text:
+        return text
+    text = _RESET_SPACE_AFTER.sub(r"\1 ", text)
+    text = _RESET_SPACE_BEFORE_PAREN.sub(" (", text)
+    text = _RESET_SPACE_AFTER_COMMA.sub(", ", text)
+    text = _RESET_SPACE_BEFORE_AMPM.sub(" ", text)
+    return text
 
 
 def fetch_fresh() -> list:
@@ -419,18 +517,21 @@ class CodexBarPopup(Gtk.Application):
             self.window = self.build_window()
         self.window.present()
 
-    def _make_pill(self, label: str, css_classes: list[str], on_click) -> Gtk.Widget:
+    def _make_pill(self, label: str, css_classes: list[str], on_click,
+                   *, icon_pid: str | None = None) -> Gtk.Widget:
         """A clickable pill made from Gtk.Box + Gtk.Label so we bypass
-        Gtk.Button styling. Returns the box."""
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        Gtk.Button styling. Optionally prefixes a provider SVG icon."""
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         box.set_css_classes(css_classes)
+        if icon_pid:
+            icon = make_icon(icon_pid, size=14)
+            if icon is not None:
+                box.append(icon)
         lbl = Gtk.Label(label=label)
         box.append(lbl)
         gesture = Gtk.GestureClick()
         gesture.connect("released", lambda _g, _n, _x, _y: on_click())
         box.add_controller(gesture)
-        # Pointer cursor on hover.
-        box.set_cursor(Gtk.Window().get_display().__class__ and None)  # noqa: just leave default
         return box
 
     def build_window(self) -> Gtk.Window:
@@ -553,7 +654,8 @@ class CodexBarPopup(Gtk.Application):
             pill = self._make_pill(
                 PROVIDER_NAMES.get(pid, pid.title()),
                 classes,
-                lambda p=pid: self._select(p))
+                lambda p=pid: self._select(p),
+                icon_pid=pid)
             self.tabbar.append(pill)
             self.tab_buttons[pid] = pill
         self.tabbar.append(Gtk.Box(hexpand=True))
@@ -584,7 +686,21 @@ class CodexBarPopup(Gtk.Application):
         cfg = load_full_config()
         existing = {p.get("id"): bool(p.get("enabled")) for p in cfg.get("providers", [])}
 
-        # Section: providers.
+        # --- Section: which provider shows in the bar ---
+        bar_title = Gtk.Label(label="Show in bar", xalign=0.0)
+        bar_title.add_css_class("codexbar-section-title")
+        self.body.append(bar_title)
+        bar_hint = Gtk.Label(
+            label="Pick a provider to pin to the bar (session • weekly), or leave on Highest.",
+            xalign=0.0, wrap=True, max_width_chars=44)
+        bar_hint.add_css_class("codexbar-subtitle")
+        self.body.append(bar_hint)
+        self.body.append(self._build_bar_provider_picker(existing))
+
+        # Divider between sections.
+        self.body.append(self._divider())
+
+        # --- Section: enabled providers ---
         section_title = Gtk.Label(label="Providers", xalign=0.0)
         section_title.add_css_class("codexbar-section-title")
         self.body.append(section_title)
@@ -626,11 +742,51 @@ class CodexBarPopup(Gtk.Application):
         note.add_css_class("codexbar-subtitle")
         self.body.append(note)
 
+    def _build_bar_provider_picker(self, existing: dict[str, bool]) -> Gtk.Widget:
+        wrap = Gtk.FlowBox()
+        wrap.add_css_class("codexbar-bar-picker")
+        wrap.set_selection_mode(Gtk.SelectionMode.NONE)
+        wrap.set_homogeneous(False)
+        wrap.set_max_children_per_line(8)
+        current = load_state().get("barProvider")
+
+        def make_chip(pid: str | None, label: str):
+            classes = ["codexbar-tab"]
+            if pid == current or (pid is None and not current):
+                classes.append("active")
+            chip = self._make_pill(
+                label, classes,
+                lambda p=pid: self._on_bar_provider_change(p),
+                icon_pid=pid)
+            return chip
+
+        wrap.append(make_chip(None, "Highest"))
+        enabled_pids = [pid for pid, on in existing.items() if on and pid in LINUX_SUPPORTED]
+        for pid in enabled_pids:
+            wrap.append(make_chip(pid, PROVIDER_NAMES.get(pid, pid.title())))
+        return wrap
+
+    def _on_bar_provider_change(self, pid: str | None):
+        state = load_state()
+        if pid is None:
+            state.pop("barProvider", None)
+        else:
+            state["barProvider"] = pid
+        save_state(state)
+        # Re-render so the active chip highlight tracks the click.
+        self.render()
+        # Nudge waybar so the bar text updates immediately.
+        subprocess.Popen(["pkill", "-RTMIN+8", "waybar"])
+
     def _settings_row(self, pid: str, enabled: bool, *, enabled_ui: bool) -> Gtk.Widget:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         row.add_css_class("codexbar-settings-row")
         if not enabled_ui:
             row.add_css_class("disabled")
+
+        icon = make_icon(pid, size=18)
+        if icon is not None:
+            row.append(icon)
 
         name = Gtk.Label(label=PROVIDER_NAMES.get(pid, pid.title()), xalign=0.0, hexpand=True)
         name.add_css_class("codexbar-settings-name")
@@ -768,7 +924,7 @@ class CodexBarPopup(Gtk.Application):
         left.add_css_class("codexbar-section-detail-left")
         details.append(left)
 
-        reset = window.get("resetDescription") or ""
+        reset = normalize_reset_description(window.get("resetDescription") or "")
         if reset:
             reset_text = reset if reset.lower().startswith("reset") else f"Resets {reset}"
             r = Gtk.Label(label=reset_text, xalign=1.0)
