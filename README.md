@@ -44,10 +44,9 @@ compositor with Waybar + gtk4-layer-shell.
 - **OAuth → CLI fallback for Claude.** When Anthropic's OAuth endpoint
   rate-limits, the wrapper transparently retries via the local Claude CLI
   source so the bar never goes blank.
-- **Antigravity via `agy` login.** The CLI expects Antigravity's Google OAuth
+- **Antigravity via `agy` login and local SSL shim.** The CLI expects Antigravity's Google OAuth
   creds at `~/.codexbar/antigravity/oauth_creds.json` (written by the macOS
-  app). On Linux there's no such login, so the wrapper bridges the creds that
-  `agy login` drops at `~/.gemini/oauth_creds.json` — no second login needed.
+  app). The wrapper bridges the credentials that `agy login` drops at `~/.gemini/oauth_creds.json` on Linux. Additionally, it dynamically extracts the local Antigravity language server's self-signed TLS certificate and preloads a custom redirect shim (`cert_redirect.so`) to make the CLI trust local loopback connections without modifying the system CA store.
 - **Last-good cache** at `~/.cache/codexbar-waybar/last.json`. Transient 429s
   or network blips reuse the previous value and surface as `stale` instead of
   blanking the bar.
@@ -61,7 +60,7 @@ compositor with Waybar + gtk4-layer-shell.
 - [Waybar](https://github.com/Alexays/Waybar) 0.10+ (needs `signal` support
   on custom modules).
 - `jq`, `python3`, `python-gobject` (PyGObject), `gtk4`, `gtk4-layer-shell`,
-  `libadwaita` (optional but harmless).
+  `libadwaita` (optional but harmless), and a C compiler (`gcc`/`clang`/`cc`) for compiling the Antigravity SSL redirect shim.
 
 ### Arch Linux
 

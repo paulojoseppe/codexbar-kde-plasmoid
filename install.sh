@@ -61,6 +61,25 @@ install -m 0644 "$SCRIPT_DIR/codexbar.jsonc"     "$WAYBAR_CONF/modules/custom-co
 green "Installed scripts → $WAYBAR_CONF/scripts/"
 green "Installed module  → $WAYBAR_CONF/modules/custom-codexbar.json"
 
+# Compile SSL redirect shim for Antigravity
+COMPILER=""
+for cmd in gcc clang cc; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+        COMPILER="$cmd"
+        break
+    fi
+done
+
+if [[ -n "$COMPILER" ]]; then
+    if "$COMPILER" -shared -fPIC -o "$WAYBAR_CONF/scripts/cert_redirect.so" "$SCRIPT_DIR/cert_redirect.c" -ldl 2>/dev/null; then
+        green "Compiled SSL redirect shim → $WAYBAR_CONF/scripts/cert_redirect.so"
+    else
+        red "Failed to compile SSL redirect shim."
+    fi
+else
+    yellow "No C compiler (gcc/clang/cc) found on PATH. Skipping compilation of SSL redirect shim."
+fi
+
 # 4. Provider SVG icons (for the popup tabs/settings rows).
 mkdir -p "$DATA_DIR/icons"
 if [[ -d "$SCRIPT_DIR/assets/providers" ]]; then

@@ -62,6 +62,7 @@ PROVIDER_NAMES = {
     "openrouter": "OpenRouter",
     "openai": "OpenAI",
     "kimik2": "Kimi K2",
+    "antigravity": "Antigravity",
 }
 
 WINDOW_LABELS = {

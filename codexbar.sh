@@ -12,6 +12,8 @@
 
 set -u
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 CODEXBAR="${CODEXBAR_BIN:-${HOME}/.local/bin/codexbar}"
 CONFIG_PATH="${HOME}/.codexbar/config.json"
 STATE_PATH="${XDG_CONFIG_HOME:-${HOME}/.config}/codexbar-waybar/state.json"
@@ -38,6 +40,70 @@ elif [[ -f "$CONFIG_PATH" ]] && command -v jq >/dev/null 2>&1; then
     [[ ${#PROVIDERS[@]} -eq 0 ]] && PROVIDERS=(codex claude gemini)
 else
     PROVIDERS=(codex claude gemini)
+fi
+
+# Setup Antigravity SSL if it is one of the enabled providers.
+setup_antigravity_ssl() {
+    if ! command -v openssl >/dev/null 2>&1 || ! command -v lsof >/dev/null 2>&1 || ! command -v pgrep >/dev/null 2>&1; then
+        return 1
+    fi
+
+    local pid
+    pid=$(pgrep -f "Antigravity.*/language_server" | head -n 1)
+    if [[ -z "$pid" ]]; then
+        return 1
+    fi
+
+    local ports
+    ports=$(lsof -a -p "$pid" -iTCP -sTCP:LISTEN -F n 2>/dev/null | grep -oE '[0-9]+$')
+    if [[ -z "$ports" ]]; then
+        return 1
+    fi
+
+    local cert=""
+    # shellcheck disable=SC2086
+    for port in $ports; do
+        local out
+        out=$(openssl s_client -showcerts -connect 127.0.0.1:"$port" < /dev/null 2>/dev/null)
+        if [[ "$out" == *"-----BEGIN CERTIFICATE-----"* ]]; then
+            cert=$(echo "$out" | openssl x509 -outform PEM 2>/dev/null)
+            if [[ -n "$cert" ]]; then
+                break
+            fi
+        fi
+    done
+
+    if [[ -z "$cert" ]]; then
+        return 1
+    fi
+
+    local scratch_dir="${CACHE_DIR}/scratch"
+    mkdir -p "$scratch_dir"
+    local cert_file="${scratch_dir}/localhost.crt"
+    echo "$cert" > "$cert_file"
+
+    local sys_ca=""
+    for path in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem /var/lib/ca-certificates/ca-bundle.pem; do
+        if [[ -f "$path" ]]; then
+            sys_ca="$path"
+            break
+        fi
+    done
+
+    local bundle_file="${scratch_dir}/custom-ca-bundle.crt"
+    if [[ -n "$sys_ca" ]]; then
+        cat "$sys_ca" "$cert_file" > "$bundle_file"
+    else
+        cat "$cert_file" > "$bundle_file"
+    fi
+
+    ANTIGRAVITY_CUSTOM_CA_BUNDLE="$bundle_file"
+    ANTIGRAVITY_LD_PRELOAD="${SCRIPT_DIR}/cert_redirect.so"
+    return 0
+}
+
+if [[ " ${PROVIDERS[*]} " == *" antigravity "* ]]; then
+    setup_antigravity_ssl
 fi
 
 # Per-provider --source override. Codex/Claude need explicit oauth on Linux
@@ -67,10 +133,17 @@ fetch_one() {
     local p="$1" src="$2"
     local args=(usage --provider "$p" --format json --no-color)
     [[ -n "$src" ]] && args+=(--source "$src")
-    if [[ "$p" == "antigravity" && -z "${ANTIGRAVITY_OAUTH_CREDENTIALS_JSON:-}" \
-          && -f "$ANTIGRAVITY_CREDS" ]]; then
-        ANTIGRAVITY_OAUTH_CREDENTIALS_JSON="$(cat "$ANTIGRAVITY_CREDS")" \
-            "$CODEXBAR" "${args[@]}" 2>/dev/null
+    if [[ "$p" == "antigravity" ]]; then
+        if [[ -z "${ANTIGRAVITY_OAUTH_CREDENTIALS_JSON:-}" && -f "$ANTIGRAVITY_CREDS" ]]; then
+            CUSTOM_CA_BUNDLE="${ANTIGRAVITY_CUSTOM_CA_BUNDLE:-}" \
+            LD_PRELOAD="${ANTIGRAVITY_LD_PRELOAD:-}" \
+            ANTIGRAVITY_OAUTH_CREDENTIALS_JSON="$(cat "$ANTIGRAVITY_CREDS")" \
+                "$CODEXBAR" "${args[@]}" 2>/dev/null
+        else
+            CUSTOM_CA_BUNDLE="${ANTIGRAVITY_CUSTOM_CA_BUNDLE:-}" \
+            LD_PRELOAD="${ANTIGRAVITY_LD_PRELOAD:-}" \
+                "$CODEXBAR" "${args[@]}" 2>/dev/null
+        fi
         return
     fi
     "$CODEXBAR" "${args[@]}" 2>/dev/null
@@ -156,7 +229,8 @@ echo "$merged" | jq -c --arg now "$(date -u +%FT%TZ)" --arg bar_provider "$BAR_P
     def provider_name(p):
         {codex:"Codex", claude:"Claude", gemini:"Gemini",
          copilot:"Copilot", openai:"OpenAI", cursor:"Cursor",
-         vertexai:"Vertex AI", openrouter:"OpenRouter"}[p] // (p | ascii_upcase);
+         vertexai:"Vertex AI", openrouter:"OpenRouter",
+         antigravity:"Antigravity"}[p] // (p | ascii_upcase);
 
     # Insert spaces the providers omit. Claude OAuth gives "May 17 at 6:20AM"
     # (no space before AM/PM); Claude CLI gives "Resets6:20am(Europe/Paris)"

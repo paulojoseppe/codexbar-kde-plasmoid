@@ -8,13 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **Antigravity auth on Linux.** The CLI looks for Google OAuth creds at
+- **Antigravity auth and local TLS on Linux.** The CLI looks for Google OAuth creds at
   `~/.codexbar/antigravity/oauth_creds.json` (written by the macOS app), which
   never exists on Linux — so it failed with "Antigravity Google auth not found.
   Use Antigravity login to authenticate." The wrapper now bridges the creds
   that `agy login` writes to `~/.gemini/oauth_creds.json` into the
-  `ANTIGRAVITY_OAUTH_CREDENTIALS_JSON` env var the CLI honours. Override the
-  source path with `CODEXBAR_ANTIGRAVITY_CREDS`.
+  `ANTIGRAVITY_OAUTH_CREDENTIALS_JSON` env var. Additionally, a dynamic TLS redirect shim
+  (`cert_redirect.so`) is compiled on install and preloaded during loopback Antigravity queries
+  to securely trust the local server's self-signed SSL certificates without altering the
+  system CA store. Override the source credentials path with `CODEXBAR_ANTIGRAVITY_CREDS`.
 - **CLI install URL.** Release assets are now versioned
   (`CodexBarCLI-<tag>-linux-<arch>.tar.gz`); the old
   `releases/latest/download/CodexBarCLI-linux-x86_64.tar.gz` link 404s.
