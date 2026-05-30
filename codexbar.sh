@@ -54,10 +54,25 @@ declare -A FALLBACK_SOURCES=(
     [claude]=cli
 )
 
+# Antigravity has no Linux login flow in the CLI: it expects Google OAuth
+# credentials at ~/.codexbar/antigravity/oauth_creds.json (written by the macOS
+# app), or passed inline via $ANTIGRAVITY_OAUTH_CREDENTIALS_JSON. On Linux the
+# Antigravity CLI (`agy`) logs in through the shared Gemini flow and drops the
+# same Google creds at ~/.gemini/oauth_creds.json. Bridge that file into the
+# env var so an `agy` login satisfies codexbar without a second login.
+# Override the source path with $CODEXBAR_ANTIGRAVITY_CREDS.
+ANTIGRAVITY_CREDS="${CODEXBAR_ANTIGRAVITY_CREDS:-${HOME}/.gemini/oauth_creds.json}"
+
 fetch_one() {
     local p="$1" src="$2"
     local args=(usage --provider "$p" --format json --no-color)
     [[ -n "$src" ]] && args+=(--source "$src")
+    if [[ "$p" == "antigravity" && -z "${ANTIGRAVITY_OAUTH_CREDENTIALS_JSON:-}" \
+          && -f "$ANTIGRAVITY_CREDS" ]]; then
+        ANTIGRAVITY_OAUTH_CREDENTIALS_JSON="$(cat "$ANTIGRAVITY_CREDS")" \
+            "$CODEXBAR" "${args[@]}" 2>/dev/null
+        return
+    fi
     "$CODEXBAR" "${args[@]}" 2>/dev/null
 }
 

@@ -44,6 +44,10 @@ compositor with Waybar + gtk4-layer-shell.
 - **OAuth → CLI fallback for Claude.** When Anthropic's OAuth endpoint
   rate-limits, the wrapper transparently retries via the local Claude CLI
   source so the bar never goes blank.
+- **Antigravity via `agy` login.** The CLI expects Antigravity's Google OAuth
+  creds at `~/.codexbar/antigravity/oauth_creds.json` (written by the macOS
+  app). On Linux there's no such login, so the wrapper bridges the creds that
+  `agy login` drops at `~/.gemini/oauth_creds.json` — no second login needed.
 - **Last-good cache** at `~/.cache/codexbar-waybar/last.json`. Transient 429s
   or network blips reuse the previous value and surface as `stale` instead of
   blanking the bar.
@@ -81,15 +85,21 @@ sudo apt install waybar jq python3-gi gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0
 
 ### Install the codexbar CLI
 
+Release assets are versioned (`CodexBarCLI-<tag>-linux-<arch>.tar.gz`), so
+resolve the latest tag from the GitHub API rather than hard-coding it:
+
 ```bash
-curl -LO https://github.com/steipete/CodexBar/releases/latest/download/CodexBarCLI-vX-linux-x86_64.tar.gz
-tar -xzf CodexBarCLI-vX-linux-x86_64.tar.gz
+ARCH=x86_64   # or aarch64
+TAG=$(curl -fsSL https://api.github.com/repos/steipete/CodexBar/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+curl -fLO "https://github.com/steipete/CodexBar/releases/download/${TAG}/CodexBarCLI-${TAG}-linux-${ARCH}.tar.gz"
+tar -xzf "CodexBarCLI-${TAG}-linux-${ARCH}.tar.gz"
 install -m 0755 CodexBarCLI ~/.local/bin/codexbar
 codexbar --help
 ```
 
 Make sure you've already signed in via the providers' own CLIs (`codex login`,
-`claude /login`, `gcloud auth application-default login` for Gemini, etc.).
+`claude /login`, `gcloud auth application-default login` for Gemini,
+`agy login` for Antigravity, etc.).
 The CLI bootstraps a `~/.codexbar/config.json` with Codex enabled by default
 the first time it runs; use the popover's Settings view to toggle Claude,
 Gemini, or anything else on without hand-editing JSON.
@@ -151,6 +161,7 @@ definition or your shell profile.
 | `CODEXBAR_STAGGER` | `0.5` | Seconds between provider fetches (raise it if Claude OAuth keeps 429-ing). |
 | `CODEXBAR_PROVIDERS` | from `config.json` | Space-separated provider IDs to query, bypassing `~/.codexbar/config.json`. Set per-Waybar instance if you want different sets per monitor. |
 | `CODEXBAR_BAR_PROVIDER` | from `state.json` | Pin a specific provider's session/weekly to the bar regardless of state. Set to a provider ID, or unset for `Highest`. |
+| `CODEXBAR_ANTIGRAVITY_CREDS` | `~/.gemini/oauth_creds.json` | Path to the Antigravity Google OAuth creds (written by `agy login`) the wrapper feeds to the CLI. |
 | `CODEXBAR_LAYER_SHELL_LIB` | auto-detected | Override path to `libgtk4-layer-shell.so` if your distro stashes it somewhere unusual. |
 | `XDG_CACHE_HOME` | `~/.cache` | Where `last.json` snapshots live. |
 | `XDG_DATA_HOME` | `~/.local/share` | Where provider icons live (under `codexbar-waybar/icons/`). |

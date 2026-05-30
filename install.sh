@@ -29,10 +29,13 @@ if ! command -v codexbar >/dev/null 2>&1; then
     red "'codexbar' is not on PATH."
     cat <<'EOF' >&2
 
-Install the Linux CLI first:
+Install the Linux CLI first (release assets are versioned, so resolve the
+latest tag from the GitHub API; swap x86_64 → aarch64 on ARM):
 
-  curl -LO https://github.com/steipete/CodexBar/releases/latest/download/CodexBarCLI-linux-x86_64.tar.gz
-  tar -xzf CodexBarCLI-linux-x86_64.tar.gz
+  ARCH=x86_64   # or aarch64
+  TAG=$(curl -fsSL https://api.github.com/repos/steipete/CodexBar/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+  curl -fLO "https://github.com/steipete/CodexBar/releases/download/${TAG}/CodexBarCLI-${TAG}-linux-${ARCH}.tar.gz"
+  tar -xzf "CodexBarCLI-${TAG}-linux-${ARCH}.tar.gz"
   install -m 0755 CodexBarCLI ~/.local/bin/codexbar
 
 Arch users also need:  sudo pacman -S libxml2-legacy
