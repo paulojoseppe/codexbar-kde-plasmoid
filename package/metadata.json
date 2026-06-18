@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "",
+                "Name": "CodexBar KDE Plasma"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "AI provider usage monitor for KDE Plasma panels.",
+        "Icon": "applications-development",
+        "Id": "dev.codexbar.plasma",
+        "License": "MIT",
+        "Name": "CodexBar",
+        "Version": "1.0.0",
+        "Website": "https://github.com/steipete/CodexBar"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

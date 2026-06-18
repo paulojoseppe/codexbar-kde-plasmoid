@@ -1,15 +1,23 @@
-# codexbar-waybar
+# codexbar-kdeplasma
 
 [![CI](https://github.com/Marouan-chak/codexbar-waybar/actions/workflows/ci.yml/badge.svg)](https://github.com/Marouan-chak/codexbar-waybar/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> AI provider usage in your [Waybar](https://github.com/Alexays/Waybar) — and a macOS-style popover when you click it.
+> AI provider usage in your KDE Plasma panel, with the original Waybar module still kept for compatibility.
 
 [CodexBar](https://github.com/steipete/CodexBar) is a macOS menu-bar app that
 surfaces Codex / Claude / Gemini / Copilot / … usage limits and reset windows.
 It ships a Linux CLI but no desktop UI for Linux compositors.
 
-This repo bridges that gap with two pieces:
+This repo now bridges that gap for KDE Plasma with a native plasmoid:
+
+- A **KDE Plasma widget** (`dev.codexbar.plasma`) that can be added to any
+  Plasma panel. It calls the existing Linux backend, shows usage in compact
+  panel form, and opens a QML popup with provider tabs and usage windows.
+- The original **Waybar custom module** remains available for Hyprland,
+  Sway, and other Waybar setups.
+
+The legacy Waybar implementation is still made of two pieces:
 
 - A **Waybar custom module** that polls the `codexbar` CLI and shows usage as
   `🤖 5% • 1%` (session • weekly) for a pinned provider, or `🤖 5%` for the
@@ -27,8 +35,42 @@ This repo bridges that gap with two pieces:
   <img src="assets/bar.png" alt="codexbar-waybar Waybar segment showing session and weekly" width="225" />
 </p>
 
-Validated on Arch Linux + Hyprland (HyDE), but should work on any Wayland
-compositor with Waybar + gtk4-layer-shell.
+Validated originally on Arch Linux + Hyprland (HyDE) for Waybar. The Plasma
+widget targets KDE Plasma 6 and uses Plasma's QML widget APIs.
+
+## KDE Plasma install
+
+Requirements:
+
+- KDE Plasma 6 with `kpackagetool6`.
+- `jq`.
+- The `codexbar` Linux CLI from
+  [steipete/CodexBar releases](https://github.com/steipete/CodexBar/releases/latest).
+- A C compiler (`gcc`/`clang`/`cc`) is optional and only used for the
+  Antigravity SSL redirect shim.
+
+Install the widget:
+
+```bash
+./install-plasma.sh
+```
+
+Then add it from Plasma:
+
+```text
+Right-click panel or desktop -> Add Widgets -> search "CodexBar"
+```
+
+If the widget picker does not refresh immediately:
+
+```bash
+systemctl --user restart plasma-plasmashell.service
+```
+
+The installed plasmoid lives at
+`~/.local/share/plasma/plasmoids/dev.codexbar.plasma/`. Its QML frontend is in
+`package/contents/ui/main.qml`; the backend script is copied to
+`package/contents/scripts/codexbar.sh`.
 
 ## Features
 
