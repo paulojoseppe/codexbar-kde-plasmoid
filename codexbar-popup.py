@@ -84,7 +84,7 @@ PROVIDER_ICON_ALIAS = {
 # local probe). Everything else either requires browser cookies or is gated to
 # macOS in the upstream CLI.
 LINUX_SUPPORTED = {
-    "codex", "claude", "gemini", "copilot", "kilo", "openrouter", "deepseek",
+    "codex", "claude", "gemini", "copilot", "kilo", "openai", "openrouter", "deepseek",
     "moonshot", "codebuff", "zai", "warp", "venice", "crof", "minimax",
     "kimik2", "vertexai", "antigravity",
 }

@@ -147,6 +147,9 @@ ANTIGRAVITY_CREDS="${CODEXBAR_ANTIGRAVITY_CREDS:-${HOME}/.gemini/oauth_creds.jso
 fetch_one() {
     local p="$1" src="$2"
     local args=(usage --provider "$p" --format json --no-color)
+    if [[ "$p" == "openai" ]]; then
+        args+=(--json-only)
+    fi
     [[ -n "$src" ]] && args+=(--source "$src")
     if [[ "$p" == "antigravity" ]]; then
         if [[ -z "${ANTIGRAVITY_OAUTH_CREDENTIALS_JSON:-}" && -f "$ANTIGRAVITY_CREDS" ]]; then
@@ -353,9 +356,54 @@ echo "$merged" | jq -c \
         else "\(name): \(w.usedPercent)%" + reset_phrase(w)
         end;
 
+    def money(n):
+        if n == null then null
+        else "$\(((n * 100) | round / 100))" end;
+
+    def compact_num(n):
+        if n == null then "0"
+        elif n >= 1000000000 then "\(((n / 1000000000 * 10) | round / 10))B"
+        elif n >= 1000000 then "\(((n / 1000000 * 10) | round / 10))M"
+        elif n >= 1000 then "\(((n / 1000 * 10) | round / 10))K"
+        else "\(n)" end;
+
+    def openai_totals(entry):
+        (entry.usage.openAIAPIUsage.daily // []) as $days
+        | reduce $days[] as $d (
+            {costUSD: 0, requests: 0, totalTokens: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0};
+            .costUSD += ($d.costUSD // 0)
+            | .requests += ($d.requests // 0)
+            | .totalTokens += ($d.totalTokens // 0)
+            | .inputTokens += ($d.inputTokens // 0)
+            | .outputTokens += ($d.outputTokens // 0)
+            | .cachedInputTokens += ($d.cachedInputTokens // 0)
+          );
+
+    def openai_cost_pct(entry):
+        (entry.usage.providerCost // null) as $c
+        | if $c == null or ($c.limit // 0) <= 0 then null
+          else ((($c.used // 0) / $c.limit) * 100) end;
+
+    def openai_line(entry):
+        (entry.usage.providerCost // null) as $cost
+        | openai_totals(entry) as $totals
+        | if $cost != null or ($totals.requests // 0) > 0 then
+            [
+              (if $cost != null then
+                  "OpenAI API: \(money($cost.used)) used" +
+                  (if ($cost.period // "") != "" then " — \($cost.period)" else "" end)
+               else empty end),
+              (if ($totals.requests // 0) > 0 then
+                  "OpenAI API: \(compact_num($totals.requests)) requests, \(compact_num($totals.totalTokens)) tokens"
+               else empty end)
+            ] | join("\n")
+          else "" end;
+
     def provider_lines(entry):
         if entry.error then
             "\(provider_name(entry.provider)): error — \(entry.error.message)"
+        elif (entry.usage.providerCost != null or entry.usage.openAIAPIUsage != null) then
+            openai_line(entry)
         else
             [
                 fmt_window(entry.usage.primary;   "\(provider_name(entry.provider)) primary"),
@@ -367,10 +415,14 @@ echo "$merged" | jq -c \
     def max_pct(entry):
         if entry.error then 0
         else
+            openai_cost_pct(entry) as $openai_pct
+            | if $openai_pct != null then $openai_pct
+              else
             [entry.usage.primary.usedPercent,
              entry.usage.secondary.usedPercent,
              entry.usage.tertiary.usedPercent]
             | map(select(. != null)) | (max // 0)
+              end
         end;
 
     def pct_or_null(w):
@@ -381,6 +433,12 @@ echo "$merged" | jq -c \
     # and weekly inline ("3% • 12%"). Otherwise emit the global max%.
     def bar_text(entry):
         if entry == null or entry.error then "🤖 ⚠"
+        elif (entry.usage.providerCost != null or entry.usage.openAIAPIUsage != null) then
+            (entry.usage.providerCost // null) as $cost
+            | openai_totals(entry) as $totals
+            | if $cost != null then "🤖 \(money($cost.used))"
+              elif ($totals.requests // 0) > 0 then "🤖 \(compact_num($totals.requests)) req"
+              else "🤖 OpenAI" end
         else
             [pct_or_null(entry.usage.primary),
              pct_or_null(entry.usage.secondary)]
