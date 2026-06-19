@@ -32,6 +32,7 @@ kpackagetool6 --type Plasma/Applet --upgrade "$PLASMOID_SRC" >/dev/null \
     || kpackagetool6 --type Plasma/Applet --install "$PLASMOID_SRC" >/dev/null
 
 chmod 0755 "$PLASMOID_DST/contents/scripts/codexbar.sh"
+chmod 0755 "$PLASMOID_DST/contents/scripts/codexbar-config-provider.sh"
 
 COMPILER=""
 for cmd in gcc clang cc; do

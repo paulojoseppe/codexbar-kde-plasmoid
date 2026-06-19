@@ -7,15 +7,16 @@
 # until the next refresh recovers it.
 #
 # Linux-only providers — cookies/web providers are macOS-only. The list is
-# read from ~/.codexbar/config.json (use the popover's Settings view to
-# manage it); falls back to codex+claude+gemini if the file is missing.
+# read from the codexbar CLI config (use the popover's Settings view to manage
+# it); falls back to codex+claude+gemini if the file is missing.
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 CODEXBAR="${CODEXBAR_BIN:-${HOME}/.local/bin/codexbar}"
-CONFIG_PATH="${HOME}/.codexbar/config.json"
+CONFIG_PATH="${XDG_CONFIG_HOME:-${HOME}/.config}/codexbar/config.json"
+LEGACY_CONFIG_PATH="${HOME}/.codexbar/config.json"
 STATE_PATH="${XDG_CONFIG_HOME:-${HOME}/.config}/codexbar-waybar/state.json"
 CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/codexbar-waybar"
 mkdir -p "$CACHE_DIR"
@@ -50,8 +51,10 @@ esac
 if [[ -n "${CODEXBAR_PROVIDERS:-}" ]]; then
     # shellcheck disable=SC2206
     PROVIDERS=( ${CODEXBAR_PROVIDERS} )
-elif [[ -f "$CONFIG_PATH" ]] && command -v jq >/dev/null 2>&1; then
-    readarray -t PROVIDERS < <(jq -r '[.providers[]? | select(.enabled == true) | .id] | .[]' "$CONFIG_PATH" 2>/dev/null)
+elif command -v jq >/dev/null 2>&1 && [[ -f "$CONFIG_PATH" || -f "$LEGACY_CONFIG_PATH" ]]; then
+    config_read_path="$CONFIG_PATH"
+    [[ -f "$config_read_path" ]] || config_read_path="$LEGACY_CONFIG_PATH"
+    readarray -t PROVIDERS < <(jq -r '[.providers[]? | select(.enabled == true) | .id] | .[]' "$config_read_path" 2>/dev/null)
     [[ ${#PROVIDERS[@]} -eq 0 ]] && PROVIDERS=(codex claude gemini)
 else
     PROVIDERS=(codex claude gemini)
@@ -190,6 +193,15 @@ fetch_provider() {
     echo "$body"
 }
 
+fetch_cost() {
+    local p="$1"
+    case "$p" in
+        codex|claude) ;;
+        *) return 0 ;;
+    esac
+    "$CODEXBAR" cost --provider "$p" --days 30 --format json 2>/dev/null
+}
+
 # Sequential fetch with a small stagger between providers (avoids 429s).
 STAGGER_SECS="${CODEXBAR_STAGGER:-0.5}"
 LAST_GOOD="$CACHE_DIR/last.json"
@@ -201,6 +213,7 @@ i=0
 for p in "${PROVIDERS[@]}"; do
     (( i > 0 )) && sleep "$STAGGER_SECS"
     fetch_provider "$p" > "$tmpdir/$p.json"
+    fetch_cost "$p" > "$tmpdir/$p.cost.json" || true
     i=$((i + 1))
 done
 
@@ -219,6 +232,14 @@ merged="["
 first=1
 for p in "${PROVIDERS[@]}"; do
     body="$(cat "$tmpdir/$p.json")"
+    cost_body=""
+    if [[ -f "$tmpdir/$p.cost.json" ]]; then
+        cost_body="$(cat "$tmpdir/$p.cost.json")"
+    fi
+    cost_arg="null"
+    if [[ -n "$cost_body" ]] && echo "$cost_body" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+        cost_arg="$(echo "$cost_body" | jq -c '.[0]')"
+    fi
     # CLI returns a JSON array; unwrap and append elements.
     if [[ -z "$body" ]]; then
         continue
@@ -230,7 +251,7 @@ for p in "${PROVIDERS[@]}"; do
             '{provider: $provider, error: {message: $message}}')"
         continue
     fi
-    inner="$(echo "$body" | jq -c '.[]')"
+    inner="$(echo "$body" | jq -c --argjson cost "$cost_arg" 'map(if $cost == null then . else . + {cost: $cost} end) | .[]')"
     while IFS= read -r entry; do
         append_merged_entry "$entry"
     done <<< "$inner"
