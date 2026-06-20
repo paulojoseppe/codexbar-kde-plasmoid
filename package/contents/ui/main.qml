@@ -27,6 +27,11 @@ PlasmoidItem {
     property bool refreshing: false
     property bool settingsOpen: false
     property bool configProvidersLoading: false
+    property color surfaceColor: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.92)
+    property color raisedSurfaceColor: Qt.rgba(Kirigami.Theme.alternateBackgroundColor.r, Kirigami.Theme.alternateBackgroundColor.g, Kirigami.Theme.alternateBackgroundColor.b, 0.68)
+    property color subtleBorderColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.12)
+    property color mutedTextColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.62)
+    property color faintTextColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.42)
 
     function providerName(pid) {
         var names = {
@@ -299,21 +304,21 @@ PlasmoidItem {
         property string detail: ""
 
         Layout.fillWidth: true
-        implicitHeight: Kirigami.Units.gridUnit * 4.1
-        radius: 8
-        color: "#20263a"
+        implicitHeight: Kirigami.Units.gridUnit * 3.6
+        radius: 6
+        color: root.raisedSurfaceColor
         border.width: 1
-        border.color: "#313852"
+        border.color: root.subtleBorderColor
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: Kirigami.Units.largeSpacing
+            anchors.margins: Kirigami.Units.smallSpacing * 1.5
             spacing: 2
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 text: title
-                color: "#9aa6c4"
+                color: root.mutedTextColor
                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
@@ -322,8 +327,8 @@ PlasmoidItem {
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 text: value
-                color: "#f4f7ff"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.35
+                color: Kirigami.Theme.textColor
+                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.22
                 font.weight: Font.Bold
                 elide: Text.ElideRight
             }
@@ -332,7 +337,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 text: detail
                 visible: detail.length > 0
-                color: "#9aa6c4"
+                color: root.mutedTextColor
                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 elide: Text.ElideRight
             }
@@ -346,13 +351,12 @@ PlasmoidItem {
         property real deficitPercent: 0
 
         Layout.fillWidth: true
-        implicitHeight: Kirigami.Units.smallSpacing * 2
+        implicitHeight: Kirigami.Units.smallSpacing * 1.45
 
         Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: Kirigami.Theme.disabledTextColor
-            opacity: 0.24
+            color: root.subtleBorderColor
         }
 
         Rectangle {
@@ -404,11 +408,11 @@ PlasmoidItem {
         property real deficitPct: deficitPercent(windowData)
 
         Layout.fillWidth: true
-        implicitHeight: quotaCardColumn.implicitHeight + Kirigami.Units.largeSpacing * 2
-        radius: 8
-        color: "#20263a"
+        implicitHeight: quotaCardColumn.implicitHeight + Kirigami.Units.smallSpacing * 3
+        radius: 6
+        color: root.raisedSurfaceColor
         border.width: 1
-        border.color: "#313852"
+        border.color: root.subtleBorderColor
 
         ColumnLayout {
             id: quotaCardColumn
@@ -416,7 +420,7 @@ PlasmoidItem {
                 left: parent.left
                 right: parent.right
                 top: parent.top
-                margins: Kirigami.Units.largeSpacing
+                margins: Kirigami.Units.smallSpacing * 1.5
             }
             spacing: Kirigami.Units.smallSpacing
 
@@ -426,7 +430,7 @@ PlasmoidItem {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     text: title
-                    color: "#f4f7ff"
+                    color: Kirigami.Theme.textColor
                     font.weight: Font.Bold
                     elide: Text.ElideRight
                 }
@@ -444,14 +448,14 @@ PlasmoidItem {
 
                 PlasmaComponents.Label {
                     text: usedPct >= 0 ? "Used " + Math.floor(usedPct) + "%" : "Usage unknown"
-                    color: "#9aa6c4"
+                    color: root.mutedTextColor
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 }
 
                 PlasmaComponents.Label {
                     visible: reservePct > 0
                     text: "Reserve " + Math.floor(reservePct) + "%"
-                    color: "#9fdcea"
+                    color: "#5ac8d8"
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 }
 
@@ -483,7 +487,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 text: windowData && windowData.resetDescription ? "Resets " + windowData.resetDescription : ""
                 visible: text.length > 0
-                color: "#9aa6c4"
+                color: root.mutedTextColor
                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
@@ -496,15 +500,16 @@ PlasmoidItem {
         property string label: ""
         property bool selected: false
 
-        implicitWidth: tabInner.implicitWidth + Kirigami.Units.largeSpacing * 1.6
-        implicitHeight: Kirigami.Units.gridUnit * 1.7
+        implicitWidth: tabInner.implicitWidth + Kirigami.Units.largeSpacing * 1.35
+        implicitHeight: Kirigami.Units.gridUnit * 1.45
 
         Rectangle {
             anchors.fill: parent
-            radius: height / 2
-            color: selected ? "#33415f" : tabMouse.containsMouse ? "#2a3047" : "#1e2235"
+            radius: 6
+            color: selected ? Kirigami.Theme.highlightColor : tabMouse.containsMouse ? root.raisedSurfaceColor : "transparent"
             border.width: 1
-            border.color: selected ? "#6f9cff" : "#313852"
+            border.color: selected ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.8) : root.subtleBorderColor
+            opacity: selected ? 0.92 : 1
         }
 
         MouseArea {
@@ -527,7 +532,7 @@ PlasmoidItem {
 
             PlasmaComponents.Label {
                 text: label
-                color: selected ? "#ffffff" : "#a7b0ca"
+                color: selected ? Kirigami.Theme.highlightedTextColor : root.mutedTextColor
                 font.weight: selected ? Font.DemiBold : Font.Normal
             }
         }
@@ -539,14 +544,14 @@ PlasmoidItem {
         property bool providerEnabled: false
 
         Layout.fillWidth: true
-        implicitHeight: Kirigami.Units.gridUnit * 2.35
+        implicitHeight: Kirigami.Units.gridUnit * 2.05
 
         Rectangle {
             anchors.fill: parent
-            radius: 8
-            color: providerEnabled ? "#102f2d" : toggleHover.containsMouse ? "#2a3047" : "#20263a"
+            radius: 6
+            color: providerEnabled ? Qt.rgba(0.06, 0.73, 0.51, 0.14) : toggleHover.containsMouse ? root.raisedSurfaceColor : "transparent"
             border.width: 1
-            border.color: providerEnabled ? "#10B981" : "#313852"
+            border.color: providerEnabled ? "#10B981" : root.subtleBorderColor
         }
 
         MouseArea {
@@ -559,12 +564,12 @@ PlasmoidItem {
             id: toggleRow
             anchors {
                 fill: parent
-                leftMargin: Kirigami.Units.largeSpacing
-                rightMargin: Kirigami.Units.largeSpacing
+                leftMargin: Kirigami.Units.smallSpacing * 1.5
+                rightMargin: Kirigami.Units.smallSpacing * 1.5
                 topMargin: 2
                 bottomMargin: 2
             }
-            spacing: Kirigami.Units.largeSpacing
+            spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
                 source: iconSource(providerId)
@@ -577,7 +582,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
                 text: label
-                color: providerEnabled ? "#d1fae5" : "#a7b0ca"
+                color: providerEnabled ? "#d1fae5" : root.mutedTextColor
                 font.weight: providerEnabled ? Font.DemiBold : Font.Normal
                 elide: Text.ElideRight
             }
@@ -626,14 +631,14 @@ PlasmoidItem {
         property bool selected: false
 
         implicitWidth: pillRow.implicitWidth + Kirigami.Units.largeSpacing
-        implicitHeight: Kirigami.Units.gridUnit * 1.75
+        implicitHeight: Kirigami.Units.gridUnit * 1.45
 
         Rectangle {
             anchors.fill: parent
-            radius: height / 2
-            color: selected ? "#33415f" : "#252b40"
+            radius: 6
+            color: selected ? Kirigami.Theme.highlightColor : "transparent"
             border.width: 1
-            border.color: selected ? "#6f9cff" : "#3a4260"
+            border.color: selected ? Kirigami.Theme.highlightColor : root.subtleBorderColor
         }
 
         MouseArea {
@@ -656,7 +661,7 @@ PlasmoidItem {
 
             PlasmaComponents.Label {
                 text: label
-                color: selected ? "#ffffff" : "#c6cee2"
+                color: selected ? Kirigami.Theme.highlightedTextColor : root.mutedTextColor
                 font.weight: selected ? Font.DemiBold : Font.Normal
             }
         }
@@ -994,16 +999,16 @@ PlasmoidItem {
 
         Rectangle {
             anchors.fill: parent
-            radius: 10
-            color: "#171b29"
+            radius: 8
+            color: root.surfaceColor
             border.width: 1
-            border.color: "#2b324a"
+            border.color: root.subtleBorderColor
         }
 
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: Kirigami.Units.largeSpacing
-            spacing: Kirigami.Units.largeSpacing
+            spacing: Kirigami.Units.smallSpacing * 1.5
 
             RowLayout {
                 Layout.fillWidth: true
@@ -1011,12 +1016,14 @@ PlasmoidItem {
 
                 PlasmaComponents.Label {
                     text: "CodexBar"
-                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.35
+                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.18
                     font.weight: Font.Bold
                     Layout.fillWidth: true
                 }
 
                 QQC2.ToolButton {
+                    implicitWidth: Kirigami.Units.gridUnit * 1.55
+                    implicitHeight: Kirigami.Units.gridUnit * 1.55
                     icon.name: "view-refresh"
                     enabled: !refreshing
                     onClicked: root.refresh()
@@ -1025,6 +1032,8 @@ PlasmoidItem {
                 }
 
                 QQC2.ToolButton {
+                    implicitWidth: Kirigami.Units.gridUnit * 1.55
+                    implicitHeight: Kirigami.Units.gridUnit * 1.55
                     icon.name: settingsOpen ? "go-previous" : "configure"
                     onClicked: settingsOpen = !settingsOpen
                     QQC2.ToolTip.text: settingsOpen ? "Back" : "Settings"
@@ -1034,12 +1043,20 @@ PlasmoidItem {
 
             QQC2.ScrollView {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 2.25
+                Layout.preferredHeight: Kirigami.Units.gridUnit * 1.8
                 contentWidth: tabRow.implicitWidth
                 clip: true
 
+                background: Rectangle {
+                    radius: 7
+                    color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.04)
+                    border.width: 1
+                    border.color: root.subtleBorderColor
+                }
+
                 RowLayout {
                     id: tabRow
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: Kirigami.Units.smallSpacing
 
                     Repeater {
@@ -1078,16 +1095,16 @@ PlasmoidItem {
             Item {
                 Rectangle {
                     anchors.fill: parent
-                    radius: 8
-                    color: "#1e2235"
+                    radius: 6
+                    color: "transparent"
                     border.width: 1
-                    border.color: "#2f3651"
+                    border.color: root.subtleBorderColor
                 }
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: Kirigami.Units.largeSpacing
-                    spacing: Kirigami.Units.largeSpacing
+                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                    spacing: Kirigami.Units.smallSpacing * 1.5
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -1099,21 +1116,23 @@ PlasmoidItem {
 
                             PlasmaComponents.Label {
                                 text: "Provedores"
-                                color: "#f4f7ff"
-                                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.28
+                                color: Kirigami.Theme.textColor
+                                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.12
                                 font.weight: Font.Bold
                             }
 
                             PlasmaComponents.Label {
                                 Layout.fillWidth: true
                                 text: "Alterne quais provedores alimentam a barra e o pop-up."
-                                color: "#a7b0ca"
+                                color: root.mutedTextColor
                                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                 wrapMode: Text.WordWrap
                             }
                         }
 
                         QQC2.ToolButton {
+                            implicitWidth: Kirigami.Units.gridUnit * 1.55
+                            implicitHeight: Kirigami.Units.gridUnit * 1.55
                             icon.name: "view-refresh"
                             enabled: !configProvidersLoading
                             onClicked: refreshConfigProviders()
@@ -1138,7 +1157,7 @@ PlasmoidItem {
                                 visible: configProvidersLoading || configProviders.length === 0
                                 Layout.fillWidth: true
                                 text: configProvidersLoading ? "Carregando provedores..." : "Nenhum provedor encontrado"
-                                color: "#a7b0ca"
+                                color: root.mutedTextColor
                                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             }
 
@@ -1163,7 +1182,7 @@ PlasmoidItem {
 
                         PlasmaComponents.Label {
                             text: "Seleção de modelo padrão"
-                            color: "#f4f7ff"
+                            color: Kirigami.Theme.textColor
                             font.weight: Font.DemiBold
                         }
 
@@ -1192,7 +1211,7 @@ PlasmoidItem {
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         text: "~/.config/codexbar/config.json"
-                        color: "#7f8aa8"
+                        color: root.faintTextColor
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                         elide: Text.ElideRight
                     }
@@ -1221,7 +1240,15 @@ PlasmoidItem {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Kirigami.Units.largeSpacing
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Kirigami.Icon {
+                        visible: providerColumn.entry
+                        source: providerColumn.entry ? iconSource(providerColumn.entry.provider) : ""
+                        implicitWidth: Kirigami.Units.iconSizes.smallMedium
+                        implicitHeight: Kirigami.Units.iconSizes.smallMedium
+                        Layout.alignment: Qt.AlignTop
+                    }
 
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -1230,16 +1257,16 @@ PlasmoidItem {
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: providerColumn.entry ? providerName(providerColumn.entry.provider) : "Provider"
-                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.25
+                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.2
                             font.weight: Font.Bold
-                            color: "#f4f7ff"
+                            color: Kirigami.Theme.textColor
                             elide: Text.ElideRight
                         }
 
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: providerUpdateText(providerColumn.entry)
-                            color: "#9aa6c4"
+                            color: root.mutedTextColor
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             elide: Text.ElideRight
                         }
@@ -1248,22 +1275,43 @@ PlasmoidItem {
                     ColumnLayout {
                         visible: accountEmail(providerColumn.usage).length > 0 || loginMethod(providerColumn.usage).length > 0
                         Layout.fillWidth: true
-                        Layout.maximumWidth: Kirigami.Units.gridUnit * 11
+                        Layout.maximumWidth: Kirigami.Units.gridUnit * 10
                         spacing: 0
 
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: accountEmail(providerColumn.usage)
-                            color: "#c6cee2"
+                            color: Kirigami.Theme.textColor
                             font.weight: Font.DemiBold
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
                         }
 
+                        Rectangle {
+                            visible: loginMethod(providerColumn.usage).length > 0
+                            Layout.alignment: Qt.AlignRight
+                            Layout.preferredWidth: planLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
+                            Layout.preferredHeight: Kirigami.Units.gridUnit * 1.05
+                            radius: 5
+                            color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.16)
+                            border.width: 1
+                            border.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
+
+                            PlasmaComponents.Label {
+                                id: planLabel
+                                anchors.centerIn: parent
+                                text: loginMethod(providerColumn.usage)
+                                color: Kirigami.Theme.highlightColor
+                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
                         PlasmaComponents.Label {
+                            visible: false
                             Layout.fillWidth: true
                             text: loginMethod(providerColumn.usage)
-                            color: "#9aa6c4"
+                            color: root.mutedTextColor
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
@@ -1287,7 +1335,7 @@ PlasmoidItem {
                     PlasmaComponents.Label {
                         text: "Quota"
                         font.weight: Font.DemiBold
-                        color: "#f4f7ff"
+                        color: Kirigami.Theme.textColor
                     }
 
                     Repeater {
@@ -1315,7 +1363,7 @@ PlasmoidItem {
                     PlasmaComponents.Label {
                         text: "Cost"
                         font.weight: Font.DemiBold
-                        color: "#f4f7ff"
+                        color: Kirigami.Theme.textColor
                     }
 
                     GridLayout {
@@ -1357,14 +1405,14 @@ PlasmoidItem {
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: "Usage trend"
-                            color: "#9aa6c4"
+                            color: root.mutedTextColor
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             font.weight: Font.DemiBold
                         }
 
                         RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: Kirigami.Units.gridUnit * 3.8
+                            Layout.preferredHeight: Kirigami.Units.gridUnit * 2.75
                             spacing: 2
 
                             Repeater {
@@ -1385,9 +1433,9 @@ PlasmoidItem {
                                             bottom: parent.bottom
                                         }
                                         height: Math.max(3, parent.height * tokenPct)
-                                        radius: 3
+                                        radius: 2
                                         color: "#d89a3a"
-                                        opacity: 0.9
+                                        opacity: 0.84
                                     }
                                 }
                             }
@@ -1396,7 +1444,7 @@ PlasmoidItem {
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: providerColumn.cost.daily.length ? "Latest: " + shortDate(providerColumn.cost.daily[providerColumn.cost.daily.length - 1].date) : ""
-                            color: "#7f8aa8"
+                            color: root.faintTextColor
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             horizontalAlignment: Text.AlignRight
                         }
@@ -1404,7 +1452,7 @@ PlasmoidItem {
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: "Recent days"
-                            color: "#f4f7ff"
+                            color: Kirigami.Theme.textColor
                             font.weight: Font.DemiBold
                         }
 
