@@ -83,6 +83,9 @@ The installed plasmoid lives at
 - **Inline Settings** — flips the popover body to a scrollable provider list
   with per-provider switches; macOS-only providers appear in their own
   greyed-out section.
+- **Incident history** — an internal dashboard page combines recent entries
+  from the OpenAI and Claude status RSS feeds, links to the original incident,
+  and keeps the latest successful response cached for temporary network failures.
 - **OAuth → CLI fallback for Claude.** When Anthropic's OAuth endpoint
   rate-limits, the wrapper transparently retries via the local Claude CLI
   source so the bar never goes blank.
